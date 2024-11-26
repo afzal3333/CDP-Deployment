@@ -1,0 +1,100 @@
+********************************************************
+		Cloudera Data Platform
+********************************************************
+
+#two way to host - 1. CDP public cloud(hosted by cloudera) 2. CDP private cloud(Azure, AWS, GCP)
+-Both are paid 
+-take ubuntu 20
+-t2 extra large = master
+-t2 large = worker
+
+-----*** Update the server ***-----
+$ sudo apt-get update && sudo apt-get dist-upgrade -y
+
+
+-----*** Disable transparent huge pages ***-----
+
+$ sudo nano /etc/init.d/disable-transparent-hugepages
+
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          disable-transparent-hugepages
+# Required-Start:    $local_fs
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Disable Linux transparent huge pages
+# Description:       Disable Linux transparent huge pages, to improve
+#                    database performance.
+### END INIT INFO
+
+case $1 in
+  start)
+    if [ -d /sys/kernel/mm/transparent_hugepage ]; then
+      thp_path=/sys/kernel/mm/transparent_hugepage
+    elif [ -d /sys/kernel/mm/redhat_transparent_hugepage ]; then
+      thp_path=/sys/kernel/mm/redhat_transparent_hugepage
+    else
+      return 0
+    fi
+
+    echo 'never' > ${thp_path}/enabled
+    echo 'never' > ${thp_path}/defrag
+
+    unset thp_path
+    ;;
+esac
+
+$ sudo chmod 755 /etc/init.d/disable-transparent-hugepages
+
+$ sudo update-rc.d disable-transparent-hugepages defaults
+
+>>Restart server
+
+
+-----*** Install NTP ***-----
+$ sudo apt-get install ntp -y 
+
+
+-----*** Set Swappiness ***-----
+sudo sysctl -a | grep vm.swappiness    (by default 60 per it means 40 per we can used)
+sudo sysctl vm.swappiness=1
+echo 'vm.swappiness=1' | sudo tee --append /etc/sysctl.conf
+
+
+-----*** Install psycopg2 package ***----- (paste below command after #!/bin/bash in aws>Advance>paste)
+
+$ sudo apt install python -y
+
+$ curl 'https://bootstrap.pypa.io/pip/2.7/get-pip.py' > get-pip.py && sudo python get-pip.py   #(build tool for python like compilation)
+
+$ sudo pip install psycopg2==2.7.5 --ignore-installed
+
+#Creat AMI: select ec2 instance.
+1 launchAction>image>
+2 master launch from AMI > Do the boot strapping for psyp2 > take t2extra large
+3 worker launch from AMI > do the boot strapping for psyp2 > take t2large
+
+
+
+-----*** Install and start CM ***-----
+
+$ wget https://archive.cloudera.com/cm7/7.4.4/cloudera-manager-installer.bin
+# Cloudera manager(is a tool)- provides the cloudera and develope the cloudera for automating the cluster
+- Cloudera provides with central interface for deploying monotoring,configuring, trouble shooting, maintaining and securing your data lake house.
+# Cloudera runtime = it a package of technologies with which you can deployed the data lake house.
+
+$ chmod u+x cloudera-manager-installer.bin
+
+$ sudo ./cloudera-manager-installer.bin
+
+http = public ip = 7180
+https = publicip = 7183 (ssl/)
+
+#after successful: Specify host> hostname>  in host put one by one Private ip DNS of masters and workers.
+#4. Select JDK: o Install a Cloudera-provided version of OpenJDK
+#5.Enter login credential - o Another user: ubuntu > o All host accept same private key> and give the .pem key path
+
+last - custom > HDFS > Hive > Hive on Tez > hue> Uzi > yarn > zookeeper > continue.
+Data node > custom and select worker> 
+zookeeper should be run on 3
