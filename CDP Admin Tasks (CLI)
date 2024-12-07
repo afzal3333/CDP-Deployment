@@ -1,0 +1,215 @@
+*********************************************
+              CDP Admin tasks
+*********************************************
+
+#connect with any worker node
+hdfs dfs -mkdir /data
+>error: permission denied, because root of cloudera is hdfs user is desabled bydefaul
+
+# enable the hdfs user first
+
+sudo passwd hdfs
+su hdfs
+o/p: this account is currently not available
+> hdfs user is created but login is disable
+> now enable the login
+
+sudo nano /etc/passwd
+erase upto hadoop and put this - /bin/bash
+sudo adduser hdfs sudo         >>>#giving the root level permission and adding in sudo group
+su hdfs
+cd
+pwd                            >>>#important # /var/lib/hadoop-hdfs (home directory of hdfs)
+hdfs dfs -mkdir /data
+$ hdfs                         >>>#it will showing Admin,client and deamon commands
+hdfs dfs                       >>>#start for individual command $ hdfs dfs <options>
+hdfs dfsadmin                  >>>#showing how to used the admin commands
+
+# Safemode(Admin task)
+# safe mode is maintanace mode and having read only permission in safe mode
+# oozie work flow scheduler
+# automatic start the hdfs service start then at most 30 second going in safe mode(data node is not store the physical block location)
+# manuall take in safe mode for maintance/upgrade 
+
+hdfs dfsadmin -safemode get     >>>safe mode status
+  
+hdfs dfsadmin -safemode enter   >>>safe mode is on      
+
+#now safe mode is on and write should be stop, check write is stop or not.
+sudo nano abc
+#write anything in file and save file and run the file.
+hdfs dfs -put abc /data   
+o/p error will showing(write is not working in safe mode)    
+
+hdfs dfsadmin -safemode leave    >>>safe mode is off
+hdfs dfsadmin -safemode get      >>>safe mode status
+hdfs dfs -put abc /data          >>>now error will not showing because safemode is off.
+
+-----***** Creating snapshots ****----
+
+hdfs dfsadmin -allowSnapshot /data      >>>#allow snapshots in order to take the snapshots. 
+
+hdfs dfs -createSnapshot /data snap1    >>>#create snapshot, snap shot store in same directory in .snapshot
+
+hdfs lsSnapshottableDir                 >>>#list out snapshot allow (remember command)
+
+hdfs dfs -ls /data/.snapshot            >>>#see the snapshot
+
+#check snapshots on NN web UI
+#cluster>HDFS>name nodewebUI>private ip will showing, check its public ip and paste in browser then it open and at header 'SnapShot'will showing
+
+hdfs dfs -deleteSnapshot /data snap1    >>>#delete the snapshot
+
+hdfs dfsadmin -disallowSnapshot /data   >>>#Disallow snapshot
+
+--> check snapshots on NN web UI
+
+
+-----**** Change ownerships ****-----
+
+sudo useradd testuser
+sudo addgroup group1
+nano pqr                               >>>write anything in file
+hdfs dfs -put pqr /data
+hdfs dfs -ls /data
+
+hdfs dfs -chgrp group1 /data/abc       >>>#ownership commands 
+
+hdfs dfs -chown testuser /data/abc     >>>#change ownership command
+hdfs dfs -ls /data                     >>>#check ownership is changed or not
+hdfs dfs -chown testuser:group1 /data/pqr
+hdfs dfs -ls /data                    >>>#check ownership is change or not
+hdfs dfs -chmod 700 /data/abc
+hdfs dfs -ls /data
+
+hdfs dfs -ls -R
+
+
+-----**** Configuring the HDFS quota ****-----
+
+wget https://raw.githubusercontent.com/tbertinmahieux/MSongsDB/master/Tasks_Demos/CoverSongs/shs_dataset_test.txt
+ls -l
+
+
+hdfs dfs -put shs_dataset_test.txt /data           >>>put data on directory we made i.e /data.
+hdfs dfs -ls /data
+
+#we can set either namequota or setSapceQuota 
+hdfs dfsadmin -setQuota 20 /data                   >>>set qouta = number of files(in num directory and files are count and if user make more file or directory then provided quota,error message will showing )
+
+hdfs dfs -ls /data                                 >>> ls krne ke baad jo bhi byte value aayegi use space me dalna h with file/directory name.
+hdfs dfsadmin -setSpaceQuota ___ /data             >>> i.e convert 1gb into bytes(spaceQuota always take in bytes)
+hdfs dfs -count -q -h /data                        >>> -h = human readable
+
+hdfs dfs -count -q </path/to/directory>            >>> /data #important how to check the quota(quota is check by -count command) 
+quota  rem_quota  space_quota  rem_space_quota  dir_count  file_count  size  file
+ none     inf        54975	    56897           3           8     786955 /u/ 
+
+hdfs dfsadmin -clrQuota /data                      >>> clr quota, othervise it will giving write permission
+hdfs dfsadmin -clrSpaceQuota /data                 
+
+-----*** Namenode metadata backup ****-----
+#Backup is a prerequesite process(backup will take before 2 to 3 hr of decided time for chk the health)
+#How metadata is looks like and files present in metadata
+#Open new terminal and connect with name node(NN).
+cluster >instance>NN-will see the private,by reference of private ip take public ip and connect with terminal
+#nameNode metadata directory having root access.
+sudo su 
+cd
+ cd /dfs/nn
+ ls
+ cd current
+ ls
+ nano VERSION
+ ---------------------------------
+ /current: cp -r .~/nnbackup/
+ cd
+ ls
+ cd
+ #hash fuction (md5 and .sha) check the intigraty of file
+ #ABOVE commands are only for understanding, how metadata is look like.
+ #below three commands are prerquisite
+
+ hdfs fsck /                          #Prerequisite#sent to manager by ticket>>>health check of entire cluster#never see unhealthy due to under replicated, overreplicated(stop the worker node from aws and check it shows unhealthy or not if you want to check)take screenshot and attached to mail
+
+ hdfs dfsadmin -report                #prerequisite(command line report giving)
+
+ hdfs dfsadmin -report > report.txt   #prerequisite(take in the form of report)
+ ls
+ nano report.txt                      >>>download and report sent to the manager
+
+ hdfs dfsadmin -safemode enter
+
+ hdfs dfsadmin -saveNamespace         >>>manual chk pointing#current edits are merge into the fsimage
+ #upar wali command ke baad dosri terminal pe jana h, NN wali aur niche wali command fire krni hai.
+
+cd /dfs/nn
+ls 
+cd current
+cd
+mkdir nnbackup
+ls
+pwd                                  >>>chk you are in which directory.
+cd /dfs/nn
+cp -r current/ /var/lib/hadoop-hdfs/nnbackup   >>>location of backup(backup location any we can create)
+#now keep the backup in S3, through awscli command
+
+ ----->>>> Leave safemode
+ hdfs dfsadmin -safemode leave
+
+ #Now the backup is completed/done, send the report to the manager and s3 backup link send.
+
+
+ -----**** Filesystem check ****----
+
+ hdfs fsck <path>        >>path = -files
+
+ hdfs fsck /             >>/ =for all health check
+
+ ## Options for fsck. To be given after path
+ #below all are the interview questions
+ -delete					Delete corrupted files.
+ -files					Print out files being checked.
+ -files -blocks				Print out the block report
+ -files -blocks -locations		Print out locations for every block.
+ -includeSnapshots			Include snapshot data if the given path indicates a snapshottable directory or there are snapshottable 						directories under it.
+ -list-corruptfileblocks			Print out list of missing blocks and files they belong to.
+ -move					Move corrupted files to /lost+found.#lost+found = for R&D 
+
+
+ ----**** Setting Replication for a dataset ----*****
+ hdfs dfsadmin -clrSpaceQuota /data                       
+ hdfs dfs -setrep -w 4 <file-name>       #file-name= /data/abc >>>replication change(bydefault is 3) on one node only one copy is write.
+
+
+ -----**** Yarn Administration ****----
+
+ ## Submit inbuild hadoop jobs (Open 4 terminals and submit same job at a time) Moba - multi exit or open 4 terminal on same worker node
+ 
+ yarn jar /opt/cloudera/parcels/CDH/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar pi 20 500
+
+ yarn application -list                          >>> 
+
+ yarn application -list -appStates ALL           >>> Kill, New, save, accepted - ye yad rahna chahiye
+
+ ##To get application ID use 
+
+ yarn application -list
+ 
+ yarn application -status application_1459542433815_0002           >>>running wala application id lena h.
+
+ ## Kill an application.
+ #job kill in last state
+ like - take to much resources, not
+
+ yarn application -kill application_1459542433815_0002
+
+ yarn logs -applicationId application_1459542433815_0002
+ #post job logs are not used for the R&D
+ 8088
+ >goto the cluster and open YARN
+ >two way to kill the job   A. CLI        B.web UI 
+
+
+
+
