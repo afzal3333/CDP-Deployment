@@ -36,7 +36,7 @@ hdfs dfsadmin -safemode get     >>>safe mode status
 hdfs dfsadmin -safemode enter   >>>safe mode is on      
 
 #now safe mode is on and write should be stop, check write is stop or not.
-sudo nano abc
+nano abc
 #write anything in file and save file and run the file.
 hdfs dfs -put abc /data   
 o/p error will showing(write is not working in safe mode)    
@@ -49,7 +49,7 @@ hdfs dfs -put abc /data          >>>now error will not showing because safemode 
 
 hdfs dfsadmin -allowSnapshot /data      >>>#allow snapshots in order to take the snapshots. 
 
-hdfs dfs -createSnapshot /data snap1    >>>#create snapshot, snap shot store in same directory in .snapshot
+hdfs hdfs dfs -createSnapshot /data snap1    >>>#create snapshot, snap shot store in same directory in .snapshot
 
 hdfs lsSnapshottableDir                 >>>#list out snapshot allow (remember command)
 
